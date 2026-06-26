@@ -31,7 +31,7 @@ nav{background:#111;border-bottom:1px solid #222;padding:12px 20px;display:flex;
 .btn.green{background:#16a34a;color:#fff;border-color:#16a34a}
 .btn.green:hover{background:#15803d}
 .playlist{display:flex;flex-direction:column;gap:8px}
-.video-item{display:flex;align-items:center;gap:12px;background:#000;border:1px solid #222;border-radius:8px;padding:10px 14px;transition:border-color 0.15s}
+.video-item{display:flex;align-items:center;gap:12px;background:#000;border:1px solid #222;border-radius:8px;padding:10px 14px}
 .video-item.now-playing{border-color:#16a34a}
 .thumb{width:80px;height:45px;background:#1a1a1a;border-radius:6px;flex-shrink:0;overflow:hidden}
 .thumb img{width:100%;height:100%;object-fit:cover}
@@ -43,7 +43,7 @@ nav{background:#111;border-bottom:1px solid #222;padding:12px 20px;display:flex;
 .empty{text-align:center;padding:40px 20px;color:#444}
 .empty-icon{font-size:40px;margin-bottom:8px}
 .empty p{font-size:14px}
-#player-wrap{background:#000;border-radius:12px;aspect-ratio:16/9;overflow:hidden;margin-bottom:16px;position:relative}
+#player-wrap{background:#000;border-radius:12px;aspect-ratio:16/9;overflow:hidden;margin-bottom:16px}
 #player-wrap iframe{width:100%;height:100%;border:none}
 .player-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#333}
 .player-empty-icon{font-size:60px;margin-bottom:12px}
@@ -57,10 +57,9 @@ nav{background:#111;border-bottom:1px solid #222;padding:12px 20px;display:flex;
 .setting-label{font-size:14px;color:#ccc}
 .setting-desc{font-size:12px;color:#555;margin-top:2px}
 select{background:#000;border:1px solid #333;border-radius:8px;padding:6px 12px;color:#fff;font-size:13px;font-family:inherit;cursor:pointer}
-.link-box{display:flex;gap:8px;align-items:center;background:#000;border:1px solid #333;border-radius:8px;padding:10px 14px;margin-top:12px}
-.link-box code{flex:1;font-size:12px;color:#aaa;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .info{background:#0d1f0d;border:1px solid #1a3a1a;border-radius:8px;padding:12px 16px;font-size:13px;color:#4ade80;margin-bottom:16px}
 .actions-row{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}
+.sync-bar{background:#111;border:1px solid #333;border-radius:8px;padding:8px 14px;font-size:12px;color:#666;display:flex;align-items:center;gap:8px;margin-bottom:12px}
 </style>
 </head>
 <body>
@@ -74,7 +73,8 @@ select{background:#000;border:1px solid #333;border-radius:8px;padding:6px 12px;
   </div>
 </nav>
 <div id="view-admin" class="show">
-  <div class="info">💡 Aggiungi link YouTube o Vimeo. Sul TV apri la scheda <strong>Schermo TV</strong> → premi Avvia.</div>
+  <div class="info">💡 La playlist è sincronizzata su tutti i dispositivi tramite Google Sheets.</div>
+  <div class="sync-bar" id="sync-bar">⏳ Caricamento playlist...</div>
   <div class="card">
     <div class="card-title">Aggiungi video</div>
     <div class="input-row">
@@ -86,11 +86,12 @@ select{background:#000;border:1px solid #333;border-radius:8px;padding:6px 12px;
   <div class="card">
     <div class="card-title">Playlist (<span id="count">0</span> video)</div>
     <div id="playlist-list" class="playlist">
-      <div class="empty"><div class="empty-icon">🎬</div><p>Nessun video. Aggiungi il primo link.</p></div>
+      <div class="empty"><div class="empty-icon">🎬</div><p>Caricamento...</p></div>
     </div>
   </div>
   <div class="actions-row">
     <button class="btn red" onclick="clearAll()">🗑 Svuota tutto</button>
+    <button class="btn" onclick="loadPlaylist()">🔄 Aggiorna</button>
     <button class="btn green" onclick="showTab('player')">▶ Avvia sul TV</button>
   </div>
 </div>
@@ -112,7 +113,6 @@ select{background:#000;border:1px solid #333;border-radius:8px;padding:6px 12px;
     <button class="btn red" onclick="stopPlayer()">⏹ Ferma</button>
     <button class="btn primary" onclick="goFullscreen()" style="margin-left:auto">⛶ Schermo intero</button>
   </div>
-  <p style="font-size:12px;color:#555">Sul TV: apri questa pagina, vai su "Schermo TV", premi Avvia e poi Schermo intero.</p>
 </div>
 <div id="view-settings">
   <div class="card">
@@ -122,30 +122,30 @@ select{background:#000;border:1px solid #333;border-radius:8px;padding:6px 12px;
       <select id="order-select"><option value="sequence">Sequenziale</option><option value="random">Casuale</option></select>
     </div>
     <div class="setting-row">
-      <div><div class="setting-label">Pausa tra video</div><div class="setting-desc">Secondi di attesa tra un video e l'altro</div></div>
+      <div><div class="setting-label">Pausa tra video</div><div class="setting-desc">Secondi di attesa</div></div>
       <select id="gap-select"><option value="0">Nessuna</option><option value="3">3 sec</option><option value="5">5 sec</option><option value="10">10 sec</option></select>
     </div>
     <div class="setting-row">
-      <div><div class="setting-label">Durata per video</div><div class="setting-desc">Dopo quanto passa al successivo</div></div>
+      <div><div class="setting-label">Durata per video</div><div class="setting-desc">Poi passa al successivo</div></div>
       <select id="duration-select"><option value="60">1 minuto</option><option value="120">2 minuti</option><option value="180" selected>3 minuti</option><option value="300">5 minuti</option><option value="600">10 minuti</option><option value="99999">Fino alla fine</option></select>
     </div>
   </div>
   <div class="card">
     <div class="card-title">Link per il TV</div>
-    <p style="font-size:13px;color:#666">Manda questo link al TV del locale — si apre direttamente la pagina player.</p>
-    <div class="link-box">
-      <code id="page-link">—</code>
-      <button class="btn" onclick="copyLink()">📋 Copia</button>
+    <p style="font-size:13px;color:#666;margin-bottom:8px">Apri questo link su qualsiasi TV o dispositivo — la playlist è sempre aggiornata.</p>
+    <div style="background:#000;border:1px solid #333;border-radius:8px;padding:10px 14px;font-size:12px;color:#4ade80;font-family:monospace">
+      https://sebastianoiaria-mamas.github.io/mamas-video-player/
     </div>
   </div>
 </div>
 </div>
 <script>
-let playlist = JSON.parse(localStorage.getItem('mamas_playlist') || '[]');
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbycqJb4Jbr0rrQ_i6LJdRFqrm2rVXu3wslVoW3WPVuPsUov7sPFBJb2mAspS74CwedVmQ/exec';
+let playlist = [];
 let currentIndex = 0;
 let playerActive = false;
 let loopTimer = null;
-function save(){ localStorage.setItem('mamas_playlist', JSON.stringify(playlist)); }
+
 function getYtId(url){
   const p=[/youtu\.be\/([^?&]+)/,/[?&]v=([^&]+)/,/embed\/([^?]+)/,/shorts\/([^?]+)/];
   for(const r of p){const m=url.match(r);if(m)return m[1];}
@@ -167,7 +167,21 @@ function getThumb(url){
   if(yt) return `https://img.youtube.com/vi/${yt}/mqdefault.jpg`;
   return null;
 }
-function addVideo(){
+
+async function loadPlaylist(){
+  setSyncBar('⏳ Caricamento...');
+  try {
+    const res = await fetch(SCRIPT_URL + '?action=get');
+    const urls = await res.json();
+    playlist = urls.map(url => ({url, embed:getEmbed(url), thumb:getThumb(url), title:getYtId(url)?'YouTube':'Vimeo'}));
+    renderPlaylist();
+    setSyncBar('✅ Playlist sincronizzata — ' + playlist.length + ' video');
+  } catch(e) {
+    setSyncBar('❌ Errore connessione. Riprova.');
+  }
+}
+
+async function addVideo(){
   const inp=document.getElementById('url-input');
   const err=document.getElementById('url-error');
   const url=inp.value.trim();
@@ -175,22 +189,41 @@ function addVideo(){
   const embed=getEmbed(url);
   if(!embed){err.style.display='block';return;}
   err.style.display='none';
-  const yt=getYtId(url);
-  playlist.push({url,embed,thumb:getThumb(url),title:yt?'YouTube video':'Vimeo video'});
-  inp.value='';
-  save();
-  renderPlaylist();
+  setSyncBar('⏳ Salvataggio...');
+  try {
+    await fetch(SCRIPT_URL + '?action=add&url=' + encodeURIComponent(url));
+    inp.value='';
+    await loadPlaylist();
+  } catch(e) {
+    setSyncBar('❌ Errore salvataggio.');
+  }
 }
-function removeVideo(i){
-  playlist.splice(i,1);
-  if(currentIndex>=playlist.length) currentIndex=0;
-  save(); renderPlaylist();
+
+async function removeVideo(url){
+  setSyncBar('⏳ Rimozione...');
+  try {
+    await fetch(SCRIPT_URL + '?action=delete&url=' + encodeURIComponent(url));
+    await loadPlaylist();
+  } catch(e) {
+    setSyncBar('❌ Errore rimozione.');
+  }
 }
-function clearAll(){
+
+async function clearAll(){
   if(!playlist.length) return;
   if(!confirm('Svuotare tutta la playlist?')) return;
-  playlist=[];currentIndex=0;stopPlayer();save();renderPlaylist();
+  stopPlayer();
+  setSyncBar('⏳ Svuotamento...');
+  try {
+    await fetch(SCRIPT_URL + '?action=clear');
+    await loadPlaylist();
+  } catch(e) {
+    setSyncBar('❌ Errore.');
+  }
 }
+
+function setSyncBar(msg){ document.getElementById('sync-bar').textContent = msg; }
+
 function renderPlaylist(){
   const el=document.getElementById('playlist-list');
   document.getElementById('count').textContent=playlist.length;
@@ -207,22 +240,24 @@ function renderPlaylist(){
         <div class="vurl">${v.url}</div>
       </div>
       ${i===currentIndex&&playerActive?'<span class="badge">▶ In onda</span>':''}
-      <button class="btn red" onclick="removeVideo(${i})" style="height:32px;padding:0 12px;font-size:12px">✕</button>
+      <button class="btn red" onclick="removeVideo('${v.url.replace(/'/g,"\\'")}')" style="height:32px;padding:0 12px;font-size:12px">✕</button>
     </div>
   `).join('');
 }
+
 function showTab(name){
   ['admin','player','settings'].forEach(t=>{
     document.getElementById('view-'+t).classList.toggle('show',t===name);
     document.querySelectorAll('.tab')[['admin','player','settings'].indexOf(t)].classList.toggle('active',t===name);
   });
-  if(name==='settings') document.getElementById('page-link').textContent=location.href;
 }
+
 function startPlayer(){
   if(!playlist.length){alert('Aggiungi almeno un video prima.');return;}
   playerActive=true;
   loadVideo(currentIndex);
 }
+
 function loadVideo(idx){
   if(!playlist.length) return;
   currentIndex=idx%playlist.length;
@@ -230,41 +265,41 @@ function loadVideo(idx){
   document.getElementById('player-wrap').innerHTML=`<iframe src="${v.embed}" allow="autoplay;fullscreen;picture-in-picture" allowfullscreen></iframe>`;
   const sb=document.getElementById('statusbar');
   sb.style.display='flex';
-  document.getElementById('status-text').textContent=`▶ Video ${currentIndex+1} di ${playlist.length} — ${v.title}`;
+  document.getElementById('status-text').textContent=`▶ Video ${currentIndex+1} di ${playlist.length}`;
   clearTimeout(loopTimer);
   const dur=parseInt(document.getElementById('duration-select').value)||180;
   const gap=parseInt(document.getElementById('gap-select').value)||0;
   if(dur<99999) loopTimer=setTimeout(()=>nextVideo(),(dur+gap)*1000);
   renderPlaylist();
 }
+
 function nextVideo(){
   if(!playlist.length) return;
   const order=document.getElementById('order-select').value;
   const next=order==='random'?Math.floor(Math.random()*playlist.length):(currentIndex+1)%playlist.length;
   loadVideo(next);
 }
+
 function prevVideo(){
   if(!playlist.length) return;
   loadVideo((currentIndex-1+playlist.length)%playlist.length);
 }
+
 function stopPlayer(){
   playerActive=false;
   clearTimeout(loopTimer);
-  document.getElementById('player-wrap').innerHTML='<div class="player-empty"><div class="player-empty-icon">📺</div><p>Player fermato. Premi Avvia per ripartire.</p></div>';
+  document.getElementById('player-wrap').innerHTML='<div class="player-empty"><div class="player-empty-icon">📺</div><p>Player fermato.</p></div>';
   document.getElementById('statusbar').style.display='none';
   renderPlaylist();
 }
+
 function goFullscreen(){
   const el=document.getElementById('player-wrap');
   if(el.requestFullscreen) el.requestFullscreen();
   else if(el.webkitRequestFullscreen) el.webkitRequestFullscreen();
 }
-function copyLink(){
-  navigator.clipboard.writeText(location.href).then(()=>{
-    alert('Link copiato!');
-  });
-}
-renderPlaylist();
+
+loadPlaylist();
 </script>
 </body>
 </html>
