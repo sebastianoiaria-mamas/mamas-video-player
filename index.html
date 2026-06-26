@@ -14,6 +14,8 @@ nav{background:#111;border-bottom:1px solid #222;padding:12px 20px;display:flex;
 .tabs{display:flex;gap:4px;margin-left:auto}
 .tab{padding:7px 16px;border-radius:6px;border:1px solid #333;background:transparent;color:#aaa;font-size:13px;cursor:pointer;transition:all 0.15s}
 .tab.active{background:#fff;color:#000;border-color:#fff;font-weight:500}
+.tab.play-tab{background:#16a34a;color:#fff;border-color:#16a34a;font-weight:500}
+.tab.play-tab:hover{background:#15803d}
 #view-admin,#view-player,#view-settings{display:none;flex:1;padding:20px}
 #view-admin.show,#view-player.show,#view-settings.show{display:block}
 .card{background:#111;border:1px solid #222;border-radius:12px;padding:20px;margin-bottom:16px}
@@ -71,13 +73,14 @@ select{background:#000;border:1px solid #333;border-radius:8px;padding:6px 12px;
 <nav>
   <div class="logo"><span>▶</span> MAMAS Video Player</div>
   <div class="tabs">
-    <button class="tab active" onclick="showTab('admin')">📋 Playlist</button>
-    <button class="tab" onclick="showTab('player')">📺 Schermo TV</button>
-    <button class="tab" onclick="showTab('settings')">⚙️ Impostazioni</button>
+    <button class="tab active" onclick="showTab('admin')" id="tab-admin">📋 Playlist</button>
+    <button class="tab play-tab" onclick="quickPlay()" id="tab-play">▶ Play</button>
+    <button class="tab" onclick="showTab('player')" id="tab-player">📺 Schermo TV</button>
+    <button class="tab" onclick="showTab('settings')" id="tab-settings">⚙️ Impostazioni</button>
   </div>
 </nav>
 <div id="view-admin" class="show">
-  <div class="info">💡 Trascina le righe ☰ per riordinare. La playlist è sincronizzata su tutti i dispositivi.</div>
+  <div class="info">💡 Trascina le righe ☰ per riordinare. Premi ▶ Play per avviare subito.</div>
   <div class="sync-bar" id="sync-bar">⏳ Caricamento playlist...</div>
   <div class="card">
     <div class="card-title">Aggiungi video</div>
@@ -94,7 +97,7 @@ select{background:#000;border:1px solid #333;border-radius:8px;padding:6px 12px;
   <div class="actions-row">
     <button class="btn red" onclick="clearAll()">🗑 Svuota tutto</button>
     <button class="btn" onclick="loadPlaylist()">🔄 Aggiorna</button>
-    <button class="btn green" onclick="showTab('player')">▶ Avvia sul TV</button>
+    <button class="btn green" onclick="quickPlay()">▶ Play</button>
   </div>
 </div>
 <div id="view-player">
@@ -105,7 +108,7 @@ select{background:#000;border:1px solid #333;border-radius:8px;padding:6px 12px;
   <div id="player-wrap">
     <div class="player-empty">
       <div class="player-empty-icon">📺</div>
-      <p>Aggiungi video e premi Avvia</p>
+      <p>Aggiungi video e premi Play</p>
     </div>
   </div>
   <div class="controls">
@@ -156,9 +159,9 @@ function getYtId(url){
 function getVmId(url){const m=url.match(/vimeo\.com\/(?:video\/)?(\d+)/);return m?m[1]:null;}
 function getEmbed(url){
   const yt=getYtId(url);
-  if(yt)return`https://www.youtube-nocookie.com/embed/${yt}?autoplay=1&controls=0&modestbranding=1&rel=0&showinfo=0&iv_load_policy=3&disablekb=1`;
+  if(yt)return`https://www.youtube-nocookie.com/embed/${yt}?autoplay=1&mute=1&controls=0&modestbranding=1&rel=0&showinfo=0&iv_load_policy=3&disablekb=1`;
   const vm=getVmId(url);
-  if(vm)return`https://player.vimeo.com/video/${vm}?autoplay=1&loop=0&controls=0&byline=0&portrait=0&title=0`;
+  if(vm)return`https://player.vimeo.com/video/${vm}?autoplay=1&muted=1&loop=0&controls=0&byline=0&portrait=0&title=0`;
   return null;
 }
 function getThumb(url){const yt=getYtId(url);if(yt)return`https://img.youtube.com/vi/${yt}/mqdefault.jpg`;return null;}
@@ -253,10 +256,7 @@ function renderPlaylist(){
       e.dataTransfer.effectAllowed='move';
     });
     div.addEventListener('dragend',()=>div.classList.remove('dragging'));
-    div.addEventListener('dragover',e=>{
-      e.preventDefault();
-      div.classList.add('drag-over');
-    });
+    div.addEventListener('dragover',e=>{e.preventDefault();div.classList.add('drag-over');});
     div.addEventListener('dragleave',()=>div.classList.remove('drag-over'));
     div.addEventListener('drop',e=>{
       e.preventDefault();
@@ -280,8 +280,15 @@ function renderPlaylist(){
 function showTab(name){
   ['admin','player','settings'].forEach(t=>{
     document.getElementById('view-'+t).classList.toggle('show',t===name);
-    document.querySelectorAll('.tab')[['admin','player','settings'].indexOf(t)].classList.toggle('active',t===name);
+    document.getElementById('tab-'+t).classList.toggle('active',t===name);
   });
+}
+
+function quickPlay(){
+  if(!playlist.length){alert('Aggiungi almeno un video prima.');return;}
+  showTab('player');
+  playerActive=true;
+  loadVideo(0);
 }
 
 function startPlayer(){
