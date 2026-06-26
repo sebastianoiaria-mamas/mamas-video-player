@@ -159,9 +159,9 @@ function getYtId(url){
 function getVmId(url){const m=url.match(/vimeo\.com\/(?:video\/)?(\d+)/);return m?m[1]:null;}
 function getEmbed(url){
   const yt=getYtId(url);
-  if(yt)return`https://www.youtube-nocookie.com/embed/${yt}?autoplay=1&mute=1&controls=0&modestbranding=1&rel=0&showinfo=0&iv_load_policy=3&disablekb=1`;
+  if(yt)return`https://www.youtube-nocookie.com/embed/${yt}?autoplay=1&controls=0&modestbranding=1&rel=0&showinfo=0&iv_load_policy=3&disablekb=1`;
   const vm=getVmId(url);
-  if(vm)return`https://player.vimeo.com/video/${vm}?autoplay=1&muted=1&loop=0&controls=0&byline=0&portrait=0&title=0`;
+  if(vm)return`https://player.vimeo.com/video/${vm}?autoplay=1&loop=0&controls=0&byline=0&portrait=0&title=0`;
   return null;
 }
 function getThumb(url){const yt=getYtId(url);if(yt)return`https://img.youtube.com/vi/${yt}/mqdefault.jpg`;return null;}
