@@ -31,8 +31,12 @@ nav{background:#111;border-bottom:1px solid #222;padding:12px 20px;display:flex;
 .btn.green{background:#16a34a;color:#fff;border-color:#16a34a}
 .btn.green:hover{background:#15803d}
 .playlist{display:flex;flex-direction:column;gap:8px}
-.video-item{display:flex;align-items:center;gap:12px;background:#000;border:1px solid #222;border-radius:8px;padding:10px 14px}
+.video-item{display:flex;align-items:center;gap:12px;background:#000;border:1px solid #222;border-radius:8px;padding:10px 14px;transition:border-color 0.15s;cursor:default}
 .video-item.now-playing{border-color:#16a34a}
+.video-item.dragging{opacity:0.4;border:2px dashed #555}
+.video-item.drag-over{border-color:#fff;background:#1a1a1a}
+.drag-handle{color:#444;cursor:grab;font-size:18px;flex-shrink:0;user-select:none;padding:0 4px}
+.drag-handle:active{cursor:grabbing}
 .thumb{width:80px;height:45px;background:#1a1a1a;border-radius:6px;flex-shrink:0;overflow:hidden}
 .thumb img{width:100%;height:100%;object-fit:cover}
 .thumb-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#444;font-size:20px}
@@ -73,7 +77,7 @@ select{background:#000;border:1px solid #333;border-radius:8px;padding:6px 12px;
   </div>
 </nav>
 <div id="view-admin" class="show">
-  <div class="info">💡 La playlist è sincronizzata su tutti i dispositivi tramite Google Sheets.</div>
+  <div class="info">💡 Trascina le righe ☰ per riordinare. La playlist è sincronizzata su tutti i dispositivi.</div>
   <div class="sync-bar" id="sync-bar">⏳ Caricamento playlist...</div>
   <div class="card">
     <div class="card-title">Aggiungi video</div>
@@ -84,10 +88,8 @@ select{background:#000;border:1px solid #333;border-radius:8px;padding:6px 12px;
     <div id="url-error" style="font-size:12px;color:#e63946;margin-top:8px;display:none">URL non valido. Usa un link YouTube o Vimeo.</div>
   </div>
   <div class="card">
-    <div class="card-title">Playlist (<span id="count">0</span> video)</div>
-    <div id="playlist-list" class="playlist">
-      <div class="empty"><div class="empty-icon">🎬</div><p>Caricamento...</p></div>
-    </div>
+    <div class="card-title">Playlist (<span id="count">0</span> video) — trascina ☰ per riordinare</div>
+    <div id="playlist-list" class="playlist"></div>
   </div>
   <div class="actions-row">
     <button class="btn red" onclick="clearAll()">🗑 Svuota tutto</button>
@@ -132,7 +134,6 @@ select{background:#000;border:1px solid #333;border-radius:8px;padding:6px 12px;
   </div>
   <div class="card">
     <div class="card-title">Link per il TV</div>
-    <p style="font-size:13px;color:#666;margin-bottom:8px">Apri questo link su qualsiasi TV o dispositivo — la playlist è sempre aggiornata.</p>
     <div style="background:#000;border:1px solid #333;border-radius:8px;padding:10px 14px;font-size:12px;color:#4ade80;font-family:monospace">
       https://sebastianoiaria-mamas.github.io/mamas-video-player/
     </div>
@@ -140,89 +141,86 @@ select{background:#000;border:1px solid #333;border-radius:8px;padding:6px 12px;
 </div>
 </div>
 <script>
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbycqJb4Jbr0rrQ_i6LJdRFqrm2rVXu3wslVoW3WPVuPsUov7sPFBJb2mAspS74CwedVmQ/exec';
-let playlist = [];
-let currentIndex = 0;
-let playerActive = false;
-let loopTimer = null;
+const SCRIPT_URL='https://script.google.com/macros/s/AKfycbycqJb4Jbr0rrQ_i6LJdRFqrm2rVXu3wslVoW3WPVuPsUov7sPFBJb2mAspS74CwedVmQ/exec';
+let playlist=[];
+let currentIndex=0;
+let playerActive=false;
+let loopTimer=null;
+let dragSrcIndex=null;
 
 function getYtId(url){
   const p=[/youtu\.be\/([^?&]+)/,/[?&]v=([^&]+)/,/embed\/([^?]+)/,/shorts\/([^?]+)/];
   for(const r of p){const m=url.match(r);if(m)return m[1];}
   return null;
 }
-function getVmId(url){
-  const m=url.match(/vimeo\.com\/(?:video\/)?(\d+)/);
-  return m?m[1]:null;
-}
+function getVmId(url){const m=url.match(/vimeo\.com\/(?:video\/)?(\d+)/);return m?m[1]:null;}
 function getEmbed(url){
   const yt=getYtId(url);
-  if(yt) return `https://www.youtube-nocookie.com/embed/${yt}?autoplay=1&controls=0&modestbranding=1&rel=0&showinfo=0&iv_load_policy=3&disablekb=1`;
+  if(yt)return`https://www.youtube-nocookie.com/embed/${yt}?autoplay=1&controls=0&modestbranding=1&rel=0&showinfo=0&iv_load_policy=3&disablekb=1`;
   const vm=getVmId(url);
-  if(vm) return `https://player.vimeo.com/video/${vm}?autoplay=1&loop=0&controls=0&byline=0&portrait=0&title=0`;
+  if(vm)return`https://player.vimeo.com/video/${vm}?autoplay=1&loop=0&controls=0&byline=0&portrait=0&title=0`;
   return null;
 }
-function getThumb(url){
-  const yt=getYtId(url);
-  if(yt) return `https://img.youtube.com/vi/${yt}/mqdefault.jpg`;
-  return null;
-}
+function getThumb(url){const yt=getYtId(url);if(yt)return`https://img.youtube.com/vi/${yt}/mqdefault.jpg`;return null;}
 
 async function loadPlaylist(){
   setSyncBar('⏳ Caricamento...');
-  try {
-    const res = await fetch(SCRIPT_URL + '?action=get');
-    const urls = await res.json();
-    playlist = urls.map(url => ({url, embed:getEmbed(url), thumb:getThumb(url), title:getYtId(url)?'YouTube':'Vimeo'}));
+  try{
+    const res=await fetch(SCRIPT_URL+'?action=get');
+    const urls=await res.json();
+    playlist=urls.map(url=>({url,embed:getEmbed(url),thumb:getThumb(url),title:getYtId(url)?'YouTube':'Vimeo'}));
     renderPlaylist();
-    setSyncBar('✅ Playlist sincronizzata — ' + playlist.length + ' video');
-  } catch(e) {
-    setSyncBar('❌ Errore connessione. Riprova.');
-  }
+    setSyncBar('✅ Playlist sincronizzata — '+playlist.length+' video');
+  }catch(e){setSyncBar('❌ Errore connessione. Riprova.');}
+}
+
+async function saveOrder(){
+  setSyncBar('⏳ Salvataggio ordine...');
+  try{
+    await fetch(SCRIPT_URL+'?action=clear');
+    for(const v of playlist){
+      await fetch(SCRIPT_URL+'?action=add&url='+encodeURIComponent(v.url));
+    }
+    setSyncBar('✅ Ordine salvato — '+playlist.length+' video');
+  }catch(e){setSyncBar('❌ Errore salvataggio ordine.');}
 }
 
 async function addVideo(){
   const inp=document.getElementById('url-input');
   const err=document.getElementById('url-error');
   const url=inp.value.trim();
-  if(!url) return;
+  if(!url)return;
   const embed=getEmbed(url);
   if(!embed){err.style.display='block';return;}
   err.style.display='none';
   setSyncBar('⏳ Salvataggio...');
-  try {
-    await fetch(SCRIPT_URL + '?action=add&url=' + encodeURIComponent(url));
+  try{
+    await fetch(SCRIPT_URL+'?action=add&url='+encodeURIComponent(url));
     inp.value='';
     await loadPlaylist();
-  } catch(e) {
-    setSyncBar('❌ Errore salvataggio.');
-  }
+  }catch(e){setSyncBar('❌ Errore salvataggio.');}
 }
 
 async function removeVideo(url){
   setSyncBar('⏳ Rimozione...');
-  try {
-    await fetch(SCRIPT_URL + '?action=delete&url=' + encodeURIComponent(url));
+  try{
+    await fetch(SCRIPT_URL+'?action=delete&url='+encodeURIComponent(url));
     await loadPlaylist();
-  } catch(e) {
-    setSyncBar('❌ Errore rimozione.');
-  }
+  }catch(e){setSyncBar('❌ Errore rimozione.');}
 }
 
 async function clearAll(){
-  if(!playlist.length) return;
-  if(!confirm('Svuotare tutta la playlist?')) return;
+  if(!playlist.length)return;
+  if(!confirm('Svuotare tutta la playlist?'))return;
   stopPlayer();
   setSyncBar('⏳ Svuotamento...');
-  try {
-    await fetch(SCRIPT_URL + '?action=clear');
+  try{
+    await fetch(SCRIPT_URL+'?action=clear');
     await loadPlaylist();
-  } catch(e) {
-    setSyncBar('❌ Errore.');
-  }
+  }catch(e){setSyncBar('❌ Errore.');}
 }
 
-function setSyncBar(msg){ document.getElementById('sync-bar').textContent = msg; }
+function setSyncBar(msg){document.getElementById('sync-bar').textContent=msg;}
 
 function renderPlaylist(){
   const el=document.getElementById('playlist-list');
@@ -231,8 +229,14 @@ function renderPlaylist(){
     el.innerHTML='<div class="empty"><div class="empty-icon">🎬</div><p>Nessun video. Aggiungi il primo link.</p></div>';
     return;
   }
-  el.innerHTML=playlist.map((v,i)=>`
-    <div class="video-item ${i===currentIndex&&playerActive?'now-playing':''}">
+  el.innerHTML='';
+  playlist.forEach((v,i)=>{
+    const div=document.createElement('div');
+    div.className='video-item'+(i===currentIndex&&playerActive?' now-playing':'');
+    div.draggable=true;
+    div.dataset.index=i;
+    div.innerHTML=`
+      <span class="drag-handle" title="Trascina per riordinare">☰</span>
       <div class="thumb">${v.thumb?`<img src="${v.thumb}" alt="">`:
         `<div class="thumb-placeholder">▶</div>`}</div>
       <div class="vinfo">
@@ -240,9 +244,37 @@ function renderPlaylist(){
         <div class="vurl">${v.url}</div>
       </div>
       ${i===currentIndex&&playerActive?'<span class="badge">▶ In onda</span>':''}
-      <button class="btn red" onclick="removeVideo('${v.url.replace(/'/g,"\\'")}')" style="height:32px;padding:0 12px;font-size:12px">✕</button>
-    </div>
-  `).join('');
+      <button class="btn red" style="height:32px;padding:0 12px;font-size:12px">✕</button>
+    `;
+    div.querySelector('.btn.red').onclick=()=>removeVideo(v.url);
+    div.addEventListener('dragstart',e=>{
+      dragSrcIndex=i;
+      div.classList.add('dragging');
+      e.dataTransfer.effectAllowed='move';
+    });
+    div.addEventListener('dragend',()=>div.classList.remove('dragging'));
+    div.addEventListener('dragover',e=>{
+      e.preventDefault();
+      div.classList.add('drag-over');
+    });
+    div.addEventListener('dragleave',()=>div.classList.remove('drag-over'));
+    div.addEventListener('drop',e=>{
+      e.preventDefault();
+      div.classList.remove('drag-over');
+      if(dragSrcIndex===null||dragSrcIndex===i)return;
+      const moved=playlist.splice(dragSrcIndex,1)[0];
+      playlist.splice(i,0,moved);
+      if(playerActive){
+        if(dragSrcIndex===currentIndex)currentIndex=i;
+        else if(dragSrcIndex<currentIndex&&i>=currentIndex)currentIndex--;
+        else if(dragSrcIndex>currentIndex&&i<=currentIndex)currentIndex++;
+      }
+      dragSrcIndex=null;
+      renderPlaylist();
+      saveOrder();
+    });
+    el.appendChild(div);
+  });
 }
 
 function showTab(name){
@@ -259,29 +291,29 @@ function startPlayer(){
 }
 
 function loadVideo(idx){
-  if(!playlist.length) return;
+  if(!playlist.length)return;
   currentIndex=idx%playlist.length;
   const v=playlist[currentIndex];
   document.getElementById('player-wrap').innerHTML=`<iframe src="${v.embed}" allow="autoplay;fullscreen;picture-in-picture" allowfullscreen></iframe>`;
   const sb=document.getElementById('statusbar');
   sb.style.display='flex';
-  document.getElementById('status-text').textContent=`▶ Video ${currentIndex+1} di ${playlist.length}`;
+  document.getElementById('status-text').textContent=`▶ Video ${currentIndex+1} di ${playlist.length} — ${v.title}`;
   clearTimeout(loopTimer);
   const dur=parseInt(document.getElementById('duration-select').value)||180;
   const gap=parseInt(document.getElementById('gap-select').value)||0;
-  if(dur<99999) loopTimer=setTimeout(()=>nextVideo(),(dur+gap)*1000);
+  if(dur<99999)loopTimer=setTimeout(()=>nextVideo(),(dur+gap)*1000);
   renderPlaylist();
 }
 
 function nextVideo(){
-  if(!playlist.length) return;
+  if(!playlist.length)return;
   const order=document.getElementById('order-select').value;
   const next=order==='random'?Math.floor(Math.random()*playlist.length):(currentIndex+1)%playlist.length;
   loadVideo(next);
 }
 
 function prevVideo(){
-  if(!playlist.length) return;
+  if(!playlist.length)return;
   loadVideo((currentIndex-1+playlist.length)%playlist.length);
 }
 
@@ -295,8 +327,8 @@ function stopPlayer(){
 
 function goFullscreen(){
   const el=document.getElementById('player-wrap');
-  if(el.requestFullscreen) el.requestFullscreen();
-  else if(el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+  if(el.requestFullscreen)el.requestFullscreen();
+  else if(el.webkitRequestFullscreen)el.webkitRequestFullscreen();
 }
 
 loadPlaylist();
