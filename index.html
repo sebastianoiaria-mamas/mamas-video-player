@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MAMAS Video Player</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#0a0a0a;color:#fff;min-height:100vh}
+#app{display:flex;flex-direction:column;min-height:100vh}
+nav{background:#111;border-bottom:1px solid #222;padding:12px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.logo{font-size:16px;font-weight:600;color:#fff;display:flex;align-items:center;gap:8px}
+.logo span{background:#e63946;padding:4px 8px;border-radius:6px;font-size:12px}
+.tabs{display:flex;gap:4px;margin-left:auto}
+.tab{padding:7px 16px;border-radius:6px;border:1px solid #333;background:transparent;color:#aaa;font-size:13px;cursor:pointer;transition:all 0.15s}
+.tab.active{background:#fff;color:#000;border-color:#fff;font-weight:500}
+#view-admin,#view-player,#view-settings{display:none;flex:1;padding:20px}
+#view-admin.show,#view-player.show,#view-settings.show{display:block}
+.card{background:#111;border:1px solid #222;border-radius:12px;padding:20px;margin-bottom:16px}
+.card-title{font-size:12px;font-weight:500;color:#666;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:14px}
+.input-row{display:flex;gap:8px}
+.input-row input{flex:1;background:#000;border:1px solid #333;border-radius:8px;padding:0 14px;height:40px;color:#fff;font-size:14px;font-family:inherit}
+.input-row input:focus{outline:none;border-color:#555}
+.input-row input::placeholder{color:#444}
+.btn{height:40px;padding:0 18px;border-radius:8px;border:1px solid #333;background:transparent;color:#fff;font-size:14px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all 0.15s;font-family:inherit}
+.btn:hover{background:#1a1a1a}
+.btn.primary{background:#fff;color:#000;border-color:#fff;font-weight:500}
+.btn.primary:hover{background:#ddd}
+.btn.red{border-color:#e63946;color:#e63946}
+.btn.red:hover{background:#1a0506}
+.btn.green{background:#16a34a;color:#fff;border-color:#16a34a}
+.btn.green:hover{background:#15803d}
+.playlist{display:flex;flex-direction:column;gap:8px}
+.video-item{display:flex;align-items:center;gap:12px;background:#000;border:1px solid #222;border-radius:8px;padding:10px 14px;transition:border-color 0.15s}
+.video-item.now-playing{border-color:#16a34a}
+.thumb{width:80px;height:45px;background:#1a1a1a;border-radius:6px;flex-shrink:0;overflow:hidden}
+.thumb img{width:100%;height:100%;object-fit:cover}
+.thumb-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#444;font-size:20px}
+.vinfo{flex:1;min-width:0}
+.vtitle{font-size:13px;font-weight:500;color:#fff;margin-bottom:2px}
+.vurl{font-size:11px;color:#444;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.badge{font-size:11px;padding:3px 10px;border-radius:20px;background:#16a34a;color:#fff;flex-shrink:0}
+.empty{text-align:center;padding:40px 20px;color:#444}
+.empty-icon{font-size:40px;margin-bottom:8px}
+.empty p{font-size:14px}
+#player-wrap{background:#000;border-radius:12px;aspect-ratio:16/9;overflow:hidden;margin-bottom:16px;position:relative}
+#player-wrap iframe{width:100%;height:100%;border:none}
+.player-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#333}
+.player-empty-icon{font-size:60px;margin-bottom:12px}
+.player-empty p{font-size:14px}
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.statusbar{background:#111;border:1px solid #222;border-radius:8px;padding:10px 16px;font-size:13px;color:#aaa;display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.dot{width:8px;height:8px;border-radius:50%;background:#16a34a;animation:pulse 2s infinite;flex-shrink:0}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+.setting-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #1a1a1a}
+.setting-row:last-child{border-bottom:none}
+.setting-label{font-size:14px;color:#ccc}
+.setting-desc{font-size:12px;color:#555;margin-top:2px}
+select{background:#000;border:1px solid #333;border-radius:8px;padding:6px 12px;color:#fff;font-size:13px;font-family:inherit;cursor:pointer}
+.link-box{display:flex;gap:8px;align-items:center;background:#000;border:1px solid #333;border-radius:8px;padding:10px 14px;margin-top:12px}
+.link-box code{flex:1;font-size:12px;color:#aaa;font-family:monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.info{background:#0d1f0d;border:1px solid #1a3a1a;border-radius:8px;padding:12px 16px;font-size:13px;color:#4ade80;margin-bottom:16px}
+.actions-row{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}
+</style>
+</head>
+<body>
+<div id="app">
+<nav>
+  <div class="logo"><span>▶</span> MAMAS Video Player</div>
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('admin')">📋 Playlist</button>
+    <button class="tab" onclick="showTab('player')">📺 Schermo TV</button>
+    <button class="tab" onclick="showTab('settings')">⚙️ Impostazioni</button>
+  </div>
+</nav>
+<div id="view-admin" class="show">
+  <div class="info">💡 Aggiungi link YouTube o Vimeo. Sul TV apri la scheda <strong>Schermo TV</strong> → premi Avvia.</div>
+  <div class="card">
+    <div class="card-title">Aggiungi video</div>
+    <div class="input-row">
+      <input type="text" id="url-input" placeholder="https://www.youtube.com/watch?v=..." onkeydown="if(event.key==='Enter')addVideo()">
+      <button class="btn primary" onclick="addVideo()">+ Aggiungi</button>
+    </div>
+    <div id="url-error" style="font-size:12px;color:#e63946;margin-top:8px;display:none">URL non valido. Usa un link YouTube o Vimeo.</div>
+  </div>
+  <div class="card">
+    <div class="card-title">Playlist (<span id="count">0</span> video)</div>
+    <div id="playlist-list" class="playlist">
+      <div class="empty"><div class="empty-icon">🎬</div><p>Nessun video. Aggiungi il primo link.</p></div>
+    </div>
+  </div>
+  <div class="actions-row">
+    <button class="btn red" onclick="clearAll()">🗑 Svuota tutto</button>
+    <button class="btn green" onclick="showTab('player')">▶ Avvia sul TV</button>
+  </div>
+</div>
+<div id="view-player">
+  <div id="statusbar" class="statusbar" style="display:none">
+    <span class="dot"></span>
+    <span id="status-text">In riproduzione...</span>
+  </div>
+  <div id="player-wrap">
+    <div class="player-empty">
+      <div class="player-empty-icon">📺</div>
+      <p>Aggiungi video e premi Avvia</p>
+    </div>
+  </div>
+  <div class="controls">
+    <button class="btn green" onclick="startPlayer()">▶ Avvia loop</button>
+    <button class="btn" onclick="prevVideo()">⏮ Precedente</button>
+    <button class="btn" onclick="nextVideo()">⏭ Successivo</button>
+    <button class="btn red" onclick="stopPlayer()">⏹ Ferma</button>
+    <button class="btn primary" onclick="goFullscreen()" style="margin-left:auto">⛶ Schermo intero</button>
+  </div>
+  <p style="font-size:12px;color:#555">Sul TV: apri questa pagina, vai su "Schermo TV", premi Avvia e poi Schermo intero.</p>
+</div>
+<div id="view-settings">
+  <div class="card">
+    <div class="card-title">Comportamento</div>
+    <div class="setting-row">
+      <div><div class="setting-label">Ordine playlist</div><div class="setting-desc">Sequenziale o casuale</div></div>
+      <select id="order-select"><option value="sequence">Sequenziale</option><option value="random">Casuale</option></select>
+    </div>
+    <div class="setting-row">
+      <div><div class="setting-label">Pausa tra video</div><div class="setting-desc">Secondi di attesa tra un video e l'altro</div></div>
+      <select id="gap-select"><option value="0">Nessuna</option><option value="3">3 sec</option><option value="5">5 sec</option><option value="10">10 sec</option></select>
+    </div>
+    <div class="setting-row">
+      <div><div class="setting-label">Durata per video</div><div class="setting-desc">Dopo quanto passa al successivo</div></div>
+      <select id="duration-select"><option value="60">1 minuto</option><option value="120">2 minuti</option><option value="180" selected>3 minuti</option><option value="300">5 minuti</option><option value="600">10 minuti</option><option value="99999">Fino alla fine</option></select>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Link per il TV</div>
+    <p style="font-size:13px;color:#666">Manda questo link al TV del locale — si apre direttamente la pagina player.</p>
+    <div class="link-box">
+      <code id="page-link">—</code>
+      <button class="btn" onclick="copyLink()">📋 Copia</button>
+    </div>
+  </div>
+</div>
+</div>
+<script>
+let playlist = JSON.parse(localStorage.getItem('mamas_playlist') || '[]');
+let currentIndex = 0;
+let playerActive = false;
+let loopTimer = null;
+function save(){ localStorage.setItem('mamas_playlist', JSON.stringify(playlist)); }
+function getYtId(url){
+  const p=[/youtu\.be\/([^?&]+)/,/[?&]v=([^&]+)/,/embed\/([^?]+)/,/shorts\/([^?]+)/];
+  for(const r of p){const m=url.match(r);if(m)return m[1];}
+  return null;
+}
+function getVmId(url){
+  const m=url.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+  return m?m[1]:null;
+}
+function getEmbed(url){
+  const yt=getYtId(url);
+  if(yt) return `https://www.youtube-nocookie.com/embed/${yt}?autoplay=1&controls=0&modestbranding=1&rel=0&showinfo=0&iv_load_policy=3&disablekb=1`;
+  const vm=getVmId(url);
+  if(vm) return `https://player.vimeo.com/video/${vm}?autoplay=1&loop=0&controls=0&byline=0&portrait=0&title=0`;
+  return null;
+}
+function getThumb(url){
+  const yt=getYtId(url);
+  if(yt) return `https://img.youtube.com/vi/${yt}/mqdefault.jpg`;
+  return null;
+}
+function addVideo(){
+  const inp=document.getElementById('url-input');
+  const err=document.getElementById('url-error');
+  const url=inp.value.trim();
+  if(!url) return;
+  const embed=getEmbed(url);
+  if(!embed){err.style.display='block';return;}
+  err.style.display='none';
+  const yt=getYtId(url);
+  playlist.push({url,embed,thumb:getThumb(url),title:yt?'YouTube video':'Vimeo video'});
+  inp.value='';
+  save();
+  renderPlaylist();
+}
+function removeVideo(i){
+  playlist.splice(i,1);
+  if(currentIndex>=playlist.length) currentIndex=0;
+  save(); renderPlaylist();
+}
+function clearAll(){
+  if(!playlist.length) return;
+  if(!confirm('Svuotare tutta la playlist?')) return;
+  playlist=[];currentIndex=0;stopPlayer();save();renderPlaylist();
+}
+function renderPlaylist(){
+  const el=document.getElementById('playlist-list');
+  document.getElementById('count').textContent=playlist.length;
+  if(!playlist.length){
+    el.innerHTML='<div class="empty"><div class="empty-icon">🎬</div><p>Nessun video. Aggiungi il primo link.</p></div>';
+    return;
+  }
+  el.innerHTML=playlist.map((v,i)=>`
+    <div class="video-item ${i===currentIndex&&playerActive?'now-playing':''}">
+      <div class="thumb">${v.thumb?`<img src="${v.thumb}" alt="">`:
+        `<div class="thumb-placeholder">▶</div>`}</div>
+      <div class="vinfo">
+        <div class="vtitle">${i+1}. ${v.title}</div>
+        <div class="vurl">${v.url}</div>
+      </div>
+      ${i===currentIndex&&playerActive?'<span class="badge">▶ In onda</span>':''}
+      <button class="btn red" onclick="removeVideo(${i})" style="height:32px;padding:0 12px;font-size:12px">✕</button>
+    </div>
+  `).join('');
+}
+function showTab(name){
+  ['admin','player','settings'].forEach(t=>{
+    document.getElementById('view-'+t).classList.toggle('show',t===name);
+    document.querySelectorAll('.tab')[['admin','player','settings'].indexOf(t)].classList.toggle('active',t===name);
+  });
+  if(name==='settings') document.getElementById('page-link').textContent=location.href;
+}
+function startPlayer(){
+  if(!playlist.length){alert('Aggiungi almeno un video prima.');return;}
+  playerActive=true;
+  loadVideo(currentIndex);
+}
+function loadVideo(idx){
+  if(!playlist.length) return;
+  currentIndex=idx%playlist.length;
+  const v=playlist[currentIndex];
+  document.getElementById('player-wrap').innerHTML=`<iframe src="${v.embed}" allow="autoplay;fullscreen;picture-in-picture" allowfullscreen></iframe>`;
+  const sb=document.getElementById('statusbar');
+  sb.style.display='flex';
+  document.getElementById('status-text').textContent=`▶ Video ${currentIndex+1} di ${playlist.length} — ${v.title}`;
+  clearTimeout(loopTimer);
+  const dur=parseInt(document.getElementById('duration-select').value)||180;
+  const gap=parseInt(document.getElementById('gap-select').value)||0;
+  if(dur<99999) loopTimer=setTimeout(()=>nextVideo(),(dur+gap)*1000);
+  renderPlaylist();
+}
+function nextVideo(){
+  if(!playlist.length) return;
+  const order=document.getElementById('order-select').value;
+  const next=order==='random'?Math.floor(Math.random()*playlist.length):(currentIndex+1)%playlist.length;
+  loadVideo(next);
+}
+function prevVideo(){
+  if(!playlist.length) return;
+  loadVideo((currentIndex-1+playlist.length)%playlist.length);
+}
+function stopPlayer(){
+  playerActive=false;
+  clearTimeout(loopTimer);
+  document.getElementById('player-wrap').innerHTML='<div class="player-empty"><div class="player-empty-icon">📺</div><p>Player fermato. Premi Avvia per ripartire.</p></div>';
+  document.getElementById('statusbar').style.display='none';
+  renderPlaylist();
+}
+function goFullscreen(){
+  const el=document.getElementById('player-wrap');
+  if(el.requestFullscreen) el.requestFullscreen();
+  else if(el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+}
+function copyLink(){
+  navigator.clipboard.writeText(location.href).then(()=>{
+    alert('Link copiato!');
+  });
+}
+renderPlaylist();
+</script>
+</body>
+</html>
